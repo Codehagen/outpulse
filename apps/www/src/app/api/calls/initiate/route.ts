@@ -7,6 +7,10 @@ import twilio from "twilio";
 // For local development, set this environment variable to your ngrok URL
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
 
+// WebSocket Server URL (our standalone server)
+const WEBSOCKET_SERVER_URL =
+  process.env.WEBSOCKET_SERVER_URL || "http://localhost:8000";
+
 export async function POST(request: Request) {
   try {
     console.log("Initiating call request received");
@@ -21,13 +25,14 @@ export async function POST(request: Request) {
     const userId = session.session.userId;
     console.log(`Authenticated user: ${userId}`);
 
-    // Get user's Twilio credentials
+    // Get user's Twilio and ElevenLabs credentials
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         twilioAccountSid: true,
         twilioAuthToken: true,
         twilioPhoneNumber: true,
+        elevenLabsApiKey: true, // Also fetch ElevenLabs API key
       },
     });
 
@@ -39,6 +44,14 @@ export async function POST(request: Request) {
       console.log("Missing Twilio credentials");
       return NextResponse.json(
         { error: "Twilio credentials not configured" },
+        { status: 400 }
+      );
+    }
+
+    if (!user?.elevenLabsApiKey) {
+      console.log("Missing ElevenLabs API key");
+      return NextResponse.json(
+        { error: "ElevenLabs API key not configured" },
         { status: 400 }
       );
     }
@@ -81,20 +94,25 @@ export async function POST(request: Request) {
     );
     const twilioClient = twilio(user.twilioAccountSid, user.twilioAuthToken);
 
-    // Generate TwiML URL
-    // Use the PUBLIC_BASE_URL environment variable if available, otherwise use the host from the request
-    let baseUrl;
-    if (PUBLIC_BASE_URL) {
-      baseUrl = PUBLIC_BASE_URL;
-    } else {
-      const host = request.headers.get("host") || "localhost:3000";
-      const protocol = host.includes("localhost") ? "http" : "https";
-      baseUrl = `${protocol}://${host}`;
+    // Use the standalone API server for TwiML generation
+    // The TwiML URL needs to be publicly accessible for Twilio to reach it
+    let twimlUrl;
+    try {
+      const serverUrlObj = new URL(WEBSOCKET_SERVER_URL);
+
+      // Include the ElevenLabs API key and agent ID as a query parameter
+      // We'll encode it to make it URL safe
+      const encodedApiKey = encodeURIComponent(user.elevenLabsApiKey);
+      twimlUrl = `${serverUrlObj.origin}/outbound-call?agentId=${agentId}&elevenLabsApiKey=${encodedApiKey}`;
+
+      console.log(`Using standalone API TwiML URL: ${twimlUrl}`);
+    } catch (error) {
+      console.error("Error parsing WebSocket server URL:", error);
+      return NextResponse.json(
+        { error: "Invalid WebSocket server URL configuration" },
+        { status: 500 }
+      );
     }
-
-    const twimlUrl = `${baseUrl}/api/calls/twiml?agentId=${agentId}`;
-
-    console.log(`Using TwiML URL: ${twimlUrl}`);
 
     // Initiate call
     const call = await twilioClient.calls.create({

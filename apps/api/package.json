@@ -1,23 +1,26 @@
 {
-  "name": "api",
+  "name": "call-websocket-api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsup --watch",
-    "build": "tsup",
-    "start": "node dist/index.js",
-    "lint": "eslint . --ext .ts",
-    "clean": "rm -rf dist"
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
   "dependencies": {
-    "@hono/node-server": "^1.5.0",
-    "db": "*",
-    "hono": "^4.1.3"
+    "@hono/node-server": "^1.3.3",
+    "dotenv": "^16.3.1",
+    "elevenlabs-node": "^1.2.0",
+    "hono": "^3.11.2",
+    "twilio": "^4.19.3",
+    "twiml-builder": "^1.0.0",
+    "ws": "^8.14.2",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "eslint": "^8",
-    "tsup": "^8.0.2",
-    "typescript": "^5"
+    "@types/node": "^20.10.1",
+    "@types/ws": "^8.5.10",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.2"
   }
 } 

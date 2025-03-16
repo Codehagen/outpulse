@@ -9,8 +9,9 @@ const ELEVENLABS_AGENT_ID =
 // For local development, set this environment variable to your ngrok URL
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
 
-// Optional external WebSocket server (Hono-based)
-const WEBSOCKET_SERVER_URL = process.env.WEBSOCKET_SERVER_URL;
+// WebSocket Server URL (our standalone server)
+const WEBSOCKET_SERVER_URL =
+  process.env.WEBSOCKET_SERVER_URL || "http://localhost:8000";
 
 // Direct database access for agent data (no authentication required)
 async function getAgentDirectly(id: string) {
@@ -18,6 +19,13 @@ async function getAgentDirectly(id: string) {
     console.log(`Fetching agent ${id} directly from database`);
     const agent = await prisma.agent.findUnique({
       where: { id },
+      include: {
+        user: {
+          select: {
+            elevenLabsApiKey: true,
+          },
+        },
+      },
     });
 
     if (!agent) {
@@ -51,45 +59,47 @@ async function generateTwimlResponse(request: Request) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
+    // Get user's ElevenLabs API key if available
+    const elevenLabsApiKey = agent.user?.elevenLabsApiKey;
+
     // Get language from agent if it exists, otherwise default to 'en'
     const language = agent.language || "en";
 
-    // Generate the WebSocket URL - prioritize the external WebSocket server if available
-    let streamUrl;
+    // Use the external WebSocket server URL instead of our Edge runtime
+    // Convert the server URL to WebSocket URL (ws:// or wss://)
+    let wsServerUrl;
 
-    if (WEBSOCKET_SERVER_URL) {
-      // Use the external WebSocket server
-      // Convert from http to ws protocol
-      streamUrl = `${WEBSOCKET_SERVER_URL.replace(/^http/, "ws").replace(
-        /^https/,
-        "wss"
-      )}/outbound-media-stream`;
-      console.log(`Using external WebSocket server: ${streamUrl}`);
-    } else {
-      // Use the built-in API route for WebSockets
-      let baseUrl;
-      if (PUBLIC_BASE_URL) {
-        // Parse the public URL to get the hostname
-        const publicUrl = new URL(PUBLIC_BASE_URL);
-        baseUrl = `${publicUrl.protocol === "https:" ? "wss" : "ws"}://${
-          publicUrl.host
-        }`;
-      } else {
-        const host = request.headers.get("host") || "localhost:3000";
-        const protocol = host.includes("localhost") ? "ws" : "wss";
-        baseUrl = `${protocol}://${host}`;
-      }
-      streamUrl = `${baseUrl}/api/calls/stream`;
-      console.log(`Using built-in WebSocket route: ${streamUrl}`);
+    try {
+      // Parse the URL and use the correct protocol (http->ws, https->wss)
+      const serverUrl = new URL(WEBSOCKET_SERVER_URL);
+      const protocol = serverUrl.protocol === "https:" ? "wss:" : "ws:";
+      wsServerUrl = `${protocol}//${serverUrl.host}/outbound-media-stream`;
+
+      console.log(`Using WebSocket server URL: ${wsServerUrl}`);
+    } catch (error) {
+      console.error("Error parsing WebSocket server URL:", error);
+      return NextResponse.json(
+        { error: "Invalid WebSocket server URL" },
+        { status: 500 }
+      );
     }
 
-    // Generate TwiML with agent data and ElevenLabs agent ID
-    const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+    // Generate TwiML with agent data and ElevenLabs information
+    // Conditionally include the API key only if it's available
+    let twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
       <Response>
         <Connect>
-          <Stream url="${streamUrl}">
+          <Stream url="${wsServerUrl}">
             <Parameter name="agentId" value="${agentId}" />
-            <Parameter name="elevenLabsAgentId" value="${ELEVENLABS_AGENT_ID}" />
+            <Parameter name="elevenLabsAgentId" value="${ELEVENLABS_AGENT_ID}" />`;
+
+    // Only include the API key if it's available
+    if (elevenLabsApiKey) {
+      twimlResponse += `\n            <Parameter name="elevenLabsApiKey" value="${elevenLabsApiKey}" />`;
+    }
+
+    // Add the remaining parameters
+    twimlResponse += `
             <Parameter name="prompt" value="${agent.description || ""}" />
             <Parameter name="firstMessage" value="${
               agent.speakingStyle || ""

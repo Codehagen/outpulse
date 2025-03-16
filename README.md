@@ -12,6 +12,7 @@
   <a href="#introduction"><strong>Introduction</strong></a> ·
   <a href="#installation"><strong>Installation</strong></a> ·
   <a href="#tech-stack--features"><strong>Tech Stack + Features</strong></a> ·
+  <a href="#deployment"><strong>Deployment</strong></a> ·
   <a href="#contributing"><strong>Contributing</strong></a>
 </p>
 <br/>
@@ -87,6 +88,53 @@ cp .env.example .env.local
 ```sh
 pnpm dev
 ```
+
+## Deployment
+
+The monorepo is set up for easy deployment to Vercel:
+
+### Vercel Deployment Configuration
+
+1. Connect your GitHub repository to Vercel.
+
+2. Configure the following project settings in Vercel:
+   - **Framework Preset**: Next.js
+   - **Root Directory**: `apps/www`
+   - **Build Command**: `prisma generate && next build`
+   - **Output Directory**: `.next`
+   - **Install Command**: `pnpm install`
+   - **Node.js Version**: 18.x or higher
+
+3. Add the required environment variables in the Vercel project settings:
+   - Copy all variables from your `.env` file
+   - Make sure to include `DATABASE_URL` and `DIRECT_URL` for Prisma
+   - Add any service API keys (Supabase, ElevenLabs, etc.)
+
+4. Deploy!
+
+### Alternative: Using vercel.json
+
+You can also include a `vercel.json` file in your repository:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "pnpm install",
+  "outputDirectory": ".next"
+}
+```
+
+> **Important**: If you use `vercel.json`, make sure your Vercel project settings still point to the correct root directory (`apps/www`).
+
+### Database Setup
+
+Before the first deployment, you need to set up your database:
+
+1. Create a database in Neon, Railway, or your preferred provider
+2. Add the connection string as `DATABASE_URL` in your Vercel environment variables
+3. Prisma will automatically run migrations on the first deployment
 
 ## Authentication Setup
 
