@@ -1,22 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "utils/db";
+import { getSession } from "@/actions/users/get-session";
 
-// Hardcoded agent ID for testing
-const ELEVENLABS_AGENT_ID =
-  process.env.ELEVENLABS_AGENT_ID || "KR70lfUkcaRuF0TTVPnq";
-
-// Twilio requires a fully qualified URL that's accessible from the internet
-// For local development, set this environment variable to your ngrok URL
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL;
-
-// WebSocket Server URL (our standalone server)
-const WEBSOCKET_SERVER_URL =
-  process.env.WEBSOCKET_SERVER_URL || "http://localhost:8000";
-
-// Direct database access for agent data (no authentication required)
-async function getAgentDirectly(id: string) {
+// Direct database access for agent data with user authentication
+async function getAgentWithFlow(id: string) {
   try {
-    console.log(`Fetching agent ${id} directly from database`);
+    console.log(`Fetching agent ${id} with flow data from database`);
     const agent = await prisma.agent.findUnique({
       where: { id },
       include: {
@@ -69,13 +58,14 @@ function generateFlowContent(agent: any) {
 
     // Debug logs to better understand the data
     console.log(
-      "Flow nodes in TwiML:",
+      "Flow nodes:",
       JSON.stringify(
-        nodes.map((n: any) => ({ id: n.id, type: n.type })),
+        nodes.map((n: any) => ({ id: n.id, type: n.type, data: n.data })),
         null,
         2
       )
     );
+    console.log("Flow edges:", JSON.stringify(edges, null, 2));
 
     // Case-insensitive node type matching
     const findNodeByType = (type: string) =>
@@ -93,13 +83,20 @@ function generateFlowContent(agent: any) {
 
     // Debug the found nodes
     console.log(
-      "Found nodes in TwiML:",
-      JSON.stringify({
-        greeting: greetingNode ? greetingNode.id : "Not found",
-        question: questionNode ? questionNode.id : "Not found",
-        branching: branchingNode ? branchingNode.id : "Not found",
-        toolCall: toolCallNode ? toolCallNode.id : "Not found",
-      })
+      "Greeting node:",
+      greetingNode ? JSON.stringify(greetingNode.data) : "Not found"
+    );
+    console.log(
+      "Question node:",
+      questionNode ? JSON.stringify(questionNode.data) : "Not found"
+    );
+    console.log(
+      "Branching node:",
+      branchingNode ? JSON.stringify(branchingNode.data) : "Not found"
+    );
+    console.log(
+      "Tool call node:",
+      toolCallNode ? JSON.stringify(toolCallNode.data) : "Not found"
     );
 
     // Get Yes and No responses from the connections to the branching node
@@ -116,6 +113,8 @@ function generateFlowContent(agent: any) {
       if (yesEdge) {
         const yesNode = nodes.find((node: any) => node.id === yesEdge.targetId);
         if (yesNode && yesNode.data) {
+          // Debug node content access
+          console.log("Yes node data:", JSON.stringify(yesNode.data));
           // Try different ways to access the content
           yesResponseContent =
             typeof yesNode.data === "string"
@@ -133,6 +132,7 @@ function generateFlowContent(agent: any) {
       if (noEdge) {
         const noNode = nodes.find((node: any) => node.id === noEdge.targetId);
         if (noNode && noNode.data) {
+          console.log("No node data:", JSON.stringify(noNode.data));
           noResponseContent =
             typeof noNode.data === "string"
               ? noNode.data
@@ -217,6 +217,7 @@ function generateFlowContent(agent: any) {
     };
   } catch (error) {
     console.error("Error generating flow content:", error);
+    console.error(error instanceof Error ? error.stack : "Unknown error");
     return {
       prompt: `You are an AI assistant representing ${agent.name}. ${agent.description || ""}`,
       firstMessage: `Hello, this is ${agent.name}. How may I assist you today?`,
@@ -224,9 +225,14 @@ function generateFlowContent(agent: any) {
   }
 }
 
-// Handler for generating TwiML response
-async function generateTwimlResponse(request: Request) {
+export async function GET(request: Request) {
   try {
+    // Check authentication
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const url = new URL(request.url);
     const agentId = url.searchParams.get("agentId");
 
@@ -237,90 +243,36 @@ async function generateTwimlResponse(request: Request) {
       );
     }
 
-    // Get agent data directly from the database (no auth required)
-    const agent = await getAgentDirectly(agentId);
+    // Get agent data from the database
+    const agent = await getAgentWithFlow(agentId);
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
-    // Get user's ElevenLabs API key if available
-    const elevenLabsApiKey = agent.user?.elevenLabsApiKey;
-
-    // Get language from agent if it exists, otherwise default to 'en'
-    const language = agent.language || "en";
-
-    // Generate prompt and first message from the flow data
+    // Generate the prompt and first message
     const { prompt, firstMessage } = generateFlowContent(agent);
 
-    // Use the external WebSocket server URL instead of our Edge runtime
-    // Convert the server URL to WebSocket URL (ws:// or wss://)
-    let wsServerUrl;
-
-    try {
-      // Parse the URL and use the correct protocol (http->ws, https->wss)
-      const serverUrl = new URL(WEBSOCKET_SERVER_URL);
-      const protocol = serverUrl.protocol === "https:" ? "wss:" : "ws:";
-      wsServerUrl = `${protocol}//${serverUrl.host}/outbound-media-stream`;
-
-      console.log(`Using WebSocket server URL: ${wsServerUrl}`);
-    } catch (error) {
-      console.error("Error parsing WebSocket server URL:", error);
-      return NextResponse.json(
-        { error: "Invalid WebSocket server URL" },
-        { status: 500 }
-      );
-    }
-
-    // Generate TwiML with agent data and ElevenLabs information
-    // Conditionally include the API key only if it's available
-    let twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-      <Response>
-        <Connect>
-          <Stream url="${wsServerUrl}">
-            <Parameter name="agentId" value="${agentId}" />
-            <Parameter name="elevenLabsAgentId" value="${ELEVENLABS_AGENT_ID}" />`;
-
-    // Only include the API key if it's available
-    if (elevenLabsApiKey) {
-      twimlResponse += `\n            <Parameter name="elevenLabsApiKey" value="${elevenLabsApiKey}" />`;
-    }
-
-    // Add the flow-generated prompt and first message
-    twimlResponse += `
-            <Parameter name="prompt" value="${prompt}" />
-            <Parameter name="firstMessage" value="${firstMessage}" />
-            <Parameter name="voiceId" value="${agent.voiceId || "alloy"}" />
-            <Parameter name="language" value="${language}" />
-          </Stream>
-        </Connect>
-      </Response>`;
-
-    console.log("Generated prompt:", prompt);
-    console.log("Generated first message:", firstMessage);
-
-    return new NextResponse(twimlResponse, {
-      headers: {
-        "Content-Type": "text/xml",
+    // Return the generated prompt and first message
+    return NextResponse.json({
+      success: true,
+      agent: {
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
+        voiceId: agent.voiceId,
       },
+      prompt,
+      firstMessage,
     });
   } catch (error) {
-    console.error("Error generating TwiML:", error);
+    console.error("Error previewing prompt:", error);
     return NextResponse.json(
       {
-        error: "Failed to generate TwiML",
+        success: false,
+        error: "Failed to generate prompt",
         details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
   }
-}
-
-// Handle GET requests
-export async function GET(request: Request) {
-  return generateTwimlResponse(request);
-}
-
-// Handle POST requests
-export async function POST(request: Request) {
-  return generateTwimlResponse(request);
 }

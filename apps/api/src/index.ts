@@ -106,6 +106,8 @@ app.all("/outbound-call", async (c) => {
 
   console.log(`[Twilio] Generating TwiML with Stream URL: ${streamUrl}`);
   console.log(`[Twilio] Using ElevenLabs Agent ID: ${elevenLabsAgentId}`);
+  console.log(`[Twilio] Prompt: ${prompt.substring(0, 100)}...`);
+  console.log(`[Twilio] First Message: ${firstMessage}`);
 
   const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
       <Response>
@@ -121,8 +123,6 @@ app.all("/outbound-call", async (c) => {
           </Stream>
         </Connect>
       </Response>`;
-
-  console.log(`[Twilio] Generated TwiML: ${twimlResponse}`);
 
   return c.text(twimlResponse, 200, {
     "Content-Type": "text/xml",
@@ -238,22 +238,52 @@ wss.on(
           console.log("[ElevenLabs] Connected to Conversational AI");
 
           // Send initial configuration with prompt and first message
+          // Get the prompt and first_message from the customParameters or use defaults
+          const prompt =
+            params.prompt ||
+            `
+            You are a professional sales representative. After greeting, always ask: 
+            "I'm calling to discuss our new service that helps businesses like yours. 
+            Do you have a few minutes to chat?"
+
+            Listen carefully to their response:
+            - If they show interest by saying yes or asking to learn more, say 
+              "Great! Let me tell you about our service..." and use the 
+              sendDiscordNotification tool to notify Discord about an interested prospect
+            - If they say they're busy or not interested, respond with 
+              "I understand you're busy. Would it be better if I sent you some 
+              information by email?"
+
+            Be polite, professional, friendly and approachable. Let the customer speak 
+            and don't be pushy. Focus on understanding their needs and concerns.
+          `;
+          const firstMessage =
+            params.firstMessage ||
+            "Hello, this is Sam calling from Codebase. Am im talking with Chris?";
+
+          console.log(
+            `[ElevenLabs] Using prompt: ${prompt.substring(0, 100)}...`
+          );
+          console.log(`[ElevenLabs] Using first message: ${firstMessage}`);
+
           const initialConfig = {
             type: "conversation_initiation_client_data",
             conversation_config_override: {
               agent: {
                 prompt: {
-                  prompt: params.prompt || "you are an AI assistant",
+                  prompt: prompt,
                 },
-                first_message:
-                  params.firstMessage || "Hello! How can I help you today?",
+                first_message: firstMessage,
               },
             },
           };
 
           console.log(
             "[ElevenLabs] Sending initial config with prompt:",
-            initialConfig.conversation_config_override.agent.prompt.prompt
+            initialConfig.conversation_config_override.agent.prompt.prompt.substring(
+              0,
+              100
+            ) + "..."
           );
 
           // Send the configuration to ElevenLabs
