@@ -1,0 +1,22 @@
+{
+  "name": "outpulse",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "eslint": "^8",
+    "prettier": "^3.0.0",
+    "turbo": "^1.12.4"
+  },
+  "packageManager": "pnpm@8.15.4"
+}

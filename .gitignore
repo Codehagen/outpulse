@@ -1,0 +1,69 @@
+# dependencies
+node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+**/coverage
+
+# next.js
+.next/
+/out/
+**/.next/
+
+# production
+/build
+/dist
+**/build
+**/dist
+
+# misc
+.DS_Store
+*.pem
+.idea/
+.vscode/
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+.env
+.env.development
+.env.test
+.env.production
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# turbo
+.turbo
+
+# Logs
+logs
+*.log
+
+# Cache
+.cache/
+.npm/
+**/.cache
+
+# Optional eslint cache
+.eslintcache
+
+.cursor
+
+.context
+
+# Large generated files
+**/*.pack
+**/*.pack.old
+

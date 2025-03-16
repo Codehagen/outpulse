@@ -1,0 +1,460 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String         @id @default(uuid())
+  email          String         @unique
+  name           String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  organization   Organization?  @relation(fields: [organizationId], references: [id])
+  organizationId String?        @map("organization_id")
+  agents         Agent[]
+  campaigns      Campaign[]
+  contactLists   ContactList[]
+  webhookTools   WebhookTool[]
+  clientTools    ClientTool[]
+  functionTools  FunctionTool[]
+
+  // API Credentials
+  twilioAccountSid  String? @map("twilio_account_sid")
+  twilioAuthToken   String? @map("twilio_auth_token")
+  twilioPhoneNumber String? @map("twilio_phone_number")
+  elevenLabsApiKey  String? @map("eleven_labs_api_key")
+
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          UserRole  @default(USER) @map("role")
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("users")
+}
+
+model Organization {
+  id        String      @id @default(uuid())
+  name      String
+  plan      PricingPlan @default(STARTER)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  users     User[]
+
+  @@map("organizations")
+}
+
+model Agent {
+  id                  String          @id @default(uuid())
+  name                String
+  description         String?
+  voiceId             String          @map("voice_id")
+  personalityTrait    String[]        @map("personality_traits")
+  energyLevel         Int             @map("energy_level")
+  speakingStyle       String?         @map("speaking_style")
+  language            String          @default("en") @map("language")
+  additionalLanguages String[]        @default([]) @map("additional_languages")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  user                User            @relation(fields: [userId], references: [id])
+  userId              String          @map("user_id")
+  campaigns           Campaign[]
+  webhookTools        WebhookTool[]
+  clientTools         ClientTool[]
+  functionTools       FunctionTool[]
+  scriptBlocks        ScriptBlock[]
+  knowledgeBase       KnowledgeBase[]
+  flows               Flow[] // Added relation to flows
+
+  @@map("agents")
+}
+
+model ScriptBlock {
+  id         String          @id @default(uuid())
+  title      String
+  content    String
+  blockType  ScriptBlockType @map("block_type")
+  order      Int
+  parentId   String?         @map("parent_id")
+  conditions Json?
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  agent      Agent           @relation(fields: [agentId], references: [id])
+  agentId    String          @map("agent_id")
+
+  @@map("script_blocks")
+}
+
+model KnowledgeBase {
+  id        String            @id @default(uuid())
+  title     String
+  content   String
+  type      KnowledgeBaseType
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  agent     Agent             @relation(fields: [agentId], references: [id])
+  agentId   String            @map("agent_id")
+
+  @@map("knowledge_base")
+}
+
+model Campaign {
+  id                String         @id @default(uuid())
+  name              String
+  status            CampaignStatus @default(DRAFT)
+  schedule          Json? // JSON object for scheduling configuration
+  callAttemptRules  Json?          @map("call_attempt_rules")
+  voicemailSettings Json?          @map("voicemail_settings")
+  transferSettings  Json?          @map("transfer_settings")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  user              User           @relation(fields: [userId], references: [id])
+  userId            String         @map("user_id")
+  agent             Agent          @relation(fields: [agentId], references: [id])
+  agentId           String         @map("agent_id")
+  contactList       ContactList    @relation(fields: [contactListId], references: [id])
+  contactListId     String         @map("contact_list_id")
+  flow              Flow?          @relation(fields: [flowId], references: [id])
+  flowId            String?        @map("flow_id")
+  calls             Call[]
+
+  @@map("campaigns")
+}
+
+model ContactList {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  user        User       @relation(fields: [userId], references: [id])
+  userId      String     @map("user_id")
+  contacts    Contact[]
+  campaigns   Campaign[]
+
+  @@map("contact_lists")
+}
+
+model Contact {
+  id            String      @id @default(uuid())
+  firstName     String      @map("first_name")
+  lastName      String      @map("last_name")
+  phoneNumber   String      @map("phone_number")
+  email         String?
+  notes         String?
+  attributes    Json? // Custom attributes for segmentation
+  doNotCall     Boolean     @default(false) @map("do_not_call")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  contactList   ContactList @relation(fields: [contactListId], references: [id])
+  contactListId String      @map("contact_list_id")
+  calls         Call[]
+
+  @@map("contacts")
+}
+
+model Call {
+  id                String      @id @default(uuid())
+  startTime         DateTime?   @map("start_time")
+  endTime           DateTime?   @map("end_time")
+  duration          Int? // Duration in seconds
+  status            CallStatus
+  recordingUrl      String?     @map("recording_url")
+  transcriptUrl     String?     @map("transcript_url")
+  disposition       String? // Outcome of the call
+  notes             String?
+  sentimentScore    Float?      @map("sentiment_score")
+  callbackScheduled DateTime?   @map("callback_scheduled")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+  campaign          Campaign    @relation(fields: [campaignId], references: [id])
+  campaignId        String      @map("campaign_id")
+  contact           Contact     @relation(fields: [contactId], references: [id])
+  contactId         String      @map("contact_id")
+  callEvents        CallEvent[]
+
+  @@map("calls")
+}
+
+model CallEvent {
+  id        String        @id @default(uuid())
+  eventType CallEventType @map("event_type")
+  timestamp DateTime
+  data      Json
+  createdAt DateTime      @default(now()) @map("created_at")
+  call      Call          @relation(fields: [callId], references: [id])
+  callId    String        @map("call_id")
+  node      Node?         @relation(fields: [nodeId], references: [id])
+  nodeId    String?       @map("node_id")
+
+  @@map("call_events")
+}
+
+model WebhookTool {
+  id           String     @id @default(uuid())
+  name         String
+  description  String?
+  endpoint     String
+  method       HttpMethod
+  headers      Json?
+  authType     AuthType?  @map("auth_type")
+  authConfig   Json?      @map("auth_config")
+  inputParams  Json?      @map("input_params")
+  outputFormat Json?      @map("output_format")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  user         User       @relation(fields: [userId], references: [id])
+  userId       String     @map("user_id")
+  agents       Agent[]
+
+  @@map("webhook_tools")
+}
+
+model ClientTool {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  eventTrigger   String?  @map("event_trigger")
+  uiComponent    String?  @map("ui_component")
+  clientFunction String   @map("client_function") // JavaScript function as string
+  inputParams    Json?    @map("input_params")
+  outputFormat   Json?    @map("output_format")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id])
+  userId         String   @map("user_id")
+  agents         Agent[]
+
+  @@map("client_tools")
+}
+
+model FunctionTool {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  functionCode String   @map("function_code") // The actual code as string
+  inputParams  Json?    @map("input_params")
+  outputFormat Json?    @map("output_format")
+  version      String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String   @map("user_id")
+  agents       Agent[]
+
+  @@map("function_tools")
+}
+
+// Enums
+
+enum PricingPlan {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum CallStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  NO_ANSWER
+  VOICEMAIL
+  BUSY
+  CANCELLED
+}
+
+enum CallEventType {
+  INITIATED
+  CONNECTED
+  TRANSFER_REQUESTED
+  TRANSFER_COMPLETED
+  TOOL_EXECUTED
+  GOAL_REACHED
+  TERMINATED
+  ERROR
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+}
+
+enum AuthType {
+  NONE
+  API_KEY
+  OAUTH
+  BASIC
+}
+
+enum ScriptBlockType {
+  GREETING
+  QUESTION
+  RESPONSE
+  CONDITION
+  TRANSFER
+  VOICEMAIL
+  CLOSING
+}
+
+enum KnowledgeBaseType {
+  DOCUMENT
+  FAQ
+  PRODUCT_INFO
+  RESPONSE_LIBRARY
+  URL
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+// New models for conversation flow
+model Flow {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  isTemplate  Boolean    @default(false) @map("is_template")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  agent       Agent      @relation(fields: [agentId], references: [id])
+  agentId     String     @map("agent_id")
+  nodes       Node[]
+  edges       Edge[]
+  campaigns   Campaign[]
+  versions    Version[]
+
+  @@map("flows")
+}
+
+model Node {
+  id          String      @id @default(uuid())
+  type        NodeType
+  positionX   Float       @map("position_x")
+  positionY   Float       @map("position_y")
+  data        Json // Flexible storage for node-specific data
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  flow        Flow        @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flowId      String      @map("flow_id")
+  sourceEdges Edge[]      @relation("EdgeSource")
+  targetEdges Edge[]      @relation("EdgeTarget")
+  callEvents  CallEvent[]
+
+  @@map("nodes")
+}
+
+model Edge {
+  id           String   @id @default(uuid())
+  label        String?
+  data         Json? // Additional data for edge (conditions, etc.)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  flow         Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flowId       String   @map("flow_id")
+  source       Node     @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  sourceId     String   @map("source_id")
+  target       Node     @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  targetId     String   @map("target_id")
+  sourceHandle String?  @map("source_handle")
+  targetHandle String?  @map("target_handle")
+
+  @@map("edges")
+}
+
+enum NodeType {
+  GREETING
+  QUESTION
+  RESPONSE
+  BRANCHING
+  CONDITION
+  TOOL_CALL
+  TRANSFER
+  VOICEMAIL
+  CLOSING
+}
+
+enum NodeDataType {
+  TEXT_CONTENT
+  QUESTION_OPTIONS
+  BRANCH_CONDITIONS
+  TOOL_CONFIG
+  TRANSFER_CONFIG
+  VOICEMAIL_CONFIG
+  CUSTOM_LOGIC
+}
+
+model Version {
+  id        String   @id @default(uuid())
+  name      String
+  snapshot  Json // Full snapshot of the flow state
+  createdAt DateTime @default(now()) @map("created_at")
+  flow      Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flowId    String   @map("flow_id")
+  createdBy String?  @map("created_by") // User ID who created this version
+
+  @@map("versions")
+}
