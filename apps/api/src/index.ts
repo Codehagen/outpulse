@@ -241,25 +241,10 @@ wss.on(
           // Get the prompt and first_message from the customParameters or use defaults
           const prompt =
             params.prompt ||
-            `
-            You are a professional sales representative. After greeting, always ask: 
-            "I'm calling to discuss our new service that helps businesses like yours. 
-            Do you have a few minutes to chat?"
-
-            Listen carefully to their response:
-            - If they show interest by saying yes or asking to learn more, say 
-              "Great! Let me tell you about our service..." and use the 
-              sendDiscordNotification tool to notify Discord about an interested prospect
-            - If they say they're busy or not interested, respond with 
-              "I understand you're busy. Would it be better if I sent you some 
-              information by email?"
-
-            Be polite, professional, friendly and approachable. Let the customer speak 
-            and don't be pushy. Focus on understanding their needs and concerns.
-          `;
+            `Du er Johannes som jobber hos Proaktiv Eiendomsmegling som har gjort research på eiendommen du eier i Fjellveien. Jeg ser at markedet rundt Fjellveien har blitt veldig bra, du har ikke vurdert en ny verdivurdering av eiendommen? Du ønsker at kunden skal si ja til å prøve å få til en ny verdivurdering at vi kan lage en for den.`;
           const firstMessage =
             params.firstMessage ||
-            "Hello, this is Sam calling from Codebase. Am im talking with Chris?";
+            "Hei dette er Johannes fra Proaktiv Eiendomsmegling, er det Ole jeg prater med?";
 
           console.log(
             `[ElevenLabs] Using prompt: ${prompt.substring(0, 100)}...`
