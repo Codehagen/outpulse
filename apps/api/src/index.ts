@@ -241,10 +241,10 @@ wss.on(
           // Get the prompt and first_message from the customParameters or use defaults
           const prompt =
             params.prompt ||
-            `Du er Johannes som jobber hos Proaktiv Eiendomsmegling som har gjort research på eiendommen du eier i Fjellveien. Jeg ser at markedet rundt Fjellveien har blitt veldig bra, du har ikke vurdert en ny verdivurdering av eiendommen? Du ønsker at kunden skal si ja til å prøve å få til en ny verdivurdering at vi kan lage en for den.`;
+            `You are Johannes who works at Proactive Real Estate and has done research on the property you own on Fjellveien. I see that the market around Fjellveien has become very good, have you considered getting a new valuation of the property? You want the customer to say yes to trying to get a new valuation that we can create for it.`;
           const firstMessage =
             params.firstMessage ||
-            "Hei dette er Johannes fra Proaktiv Eiendomsmegling, er det Ole jeg prater med?";
+            "Hi, this is Johannes from Proactive Real Estate, am I speaking with Ole?";
 
           console.log(
             `[ElevenLabs] Using prompt: ${prompt.substring(0, 100)}...`
