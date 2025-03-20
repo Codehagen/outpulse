@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
+import { ReactNode } from "react";
 
 // Schema for form validation
 const formSchema = z.object({
@@ -109,7 +110,11 @@ const templates: Record<
   },
 };
 
-export function CreateAgentSheet() {
+interface CreateAgentSheetProps {
+  children?: ReactNode;
+}
+
+export function CreateAgentSheet({ children }: CreateAgentSheetProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,10 +171,12 @@ export function CreateAgentSheet() {
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Agent
-        </Button>
+        {children || (
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Agent
+          </Button>
+        )}
       </SheetTrigger>
       <SheetContent className="sm:max-w-md md:max-w-lg overflow-y-auto">
         <SheetHeader>

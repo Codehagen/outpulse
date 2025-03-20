@@ -141,3 +141,33 @@
     background: hsl(var(--border));
   }
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heightIncrease {
+  from {
+    height: 0;
+  }
+  to {
+    height: 100%;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  
+  .animate-height-increase {
+    animation: heightIncrease 1s ease-out forwards;
+  }
+}
