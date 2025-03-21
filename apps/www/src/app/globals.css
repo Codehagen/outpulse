@@ -171,3 +171,53 @@
     animation: heightIncrease 1s ease-out forwards;
   }
 }
+
+/* Video effect styles */
+.orb {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  transition: all 0.2s ease-in-out;
+  display: block;
+}
+
+.orb-active {
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.5) 0%, rgba(124, 58, 237, 0.2) 70%, transparent 100%);
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+}
+
+.orb-inactive {
+  background: radial-gradient(circle, rgba(160, 160, 160, 0.5) 0%, rgba(160, 160, 160, 0.2) 70%, transparent 100%);
+}
+
+@keyframes orb {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes orbSlow {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-orb {
+  animation: orb 2s ease-in-out infinite;
+}
+
+.animate-orb-slow {
+  animation: orbSlow 4s ease-in-out infinite;
+}
